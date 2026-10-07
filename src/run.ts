@@ -2,6 +2,7 @@ import * as fs from 'fs/promises';
 import * as readline from 'readline';
 
 import { getModel } from './ai/providers';
+import { usesCodex } from './ai/research-model';
 import {
   deepResearch,
   writeFinalAnswer,
@@ -30,7 +31,10 @@ function askQuestion(query: string): Promise<string> {
 
 // run the agent
 async function run() {
-  console.log('Using model: ', getModel().modelId);
+  console.log(
+    'Using model: ',
+    usesCodex() ? 'Codex (ChatGPT subscription)' : getModel().modelId,
+  );
 
   // Get initial query
   const initialQuery = await askQuestion('What would you like to research? ');
@@ -117,4 +121,8 @@ ${followUpQuestions.map((q: string, i: number) => `Q: ${q}\nA: ${answers[i]}`).j
   rl.close();
 }
 
-run().catch(console.error);
+run().catch(error => {
+  console.error(error);
+  rl.close();
+  process.exitCode = 1;
+});

@@ -99,6 +99,7 @@ FIRECRAWL_KEY="your_firecrawl_key"
 # If you want to use your self-hosted Firecrawl, add the following below:
 # FIRECRAWL_BASE_URL="http://localhost:3002"
 
+RESEARCH_PROVIDER="api"
 OPENAI_KEY="your_openai_key"
 ```
 
@@ -125,6 +126,25 @@ docker compose up -d
 ```bash
 docker exec -it deep-research npm run docker
 ```
+
+## Use your ChatGPT subscription (default)
+
+Model reasoning now uses the official Codex TypeScript SDK with ChatGPT login by default. Each research step starts a separate local Codex thread and returns schema-validated JSON. It does not call an existing chat conversation.
+
+1. Install dependencies with `npm install`.
+2. Install the current Codex CLI with `npm install -g @openai/codex` and run `codex login`, choosing **Sign in with ChatGPT**. The SDK includes its own CLI runtime and reuses your saved login. Use `CODEX_PATH` only if you want a different Codex executable.
+3. Copy `.env.example` to `.env.local`, set `FIRECRAWL_KEY`, and keep `RESEARCH_PROVIDER="codex"`.
+4. Run `npm start` (interactive) or `npm run api` (local HTTP service).
+
+Codex calls are serialized, with a 10-minute timeout per turn. Set `CODEX_TIMEOUT_MS` to change that timeout or `CODEX_MODEL` to choose a model available to your plan. Firecrawl concurrency defaults to 1 in Codex mode; `FIRECRAWL_CONCURRENCY` overrides it.
+
+Subscription mode forces ChatGPT authentication and the built-in OpenAI provider, removes API-key environment variables from child processes, and never falls back to API billing. Authentication, quota, timeout, and malformed-response errors stop research rather than silently producing an incomplete report. Codex runs with a read-only sandbox, no approval requests, shell tools disabled, and web search disabled; Firecrawl supplies the source material.
+
+This uses your included Codex allowance, not an unlimited monthly API token balance. Purchased credits or workspace billing settings may still apply to your account; this application does not change those settings. Firecrawl has separate usage limits and costs. Check your plan's usage dashboard before large runs.
+
+For the original API providers, explicitly set `RESEARCH_PROVIDER="api"` and configure `OPENAI_KEY` or `FIREWORKS_KEY` as described below. Those calls are billed separately. The original Docker image is an API-mode workflow; subscription mode is intended for a local machine where you can sign in. Never commit or publish Codex credentials, and do not put subscription credentials into public CI.
+
+Official documentation: [Codex SDK](https://learn.chatgpt.com/docs/codex-sdk), [authentication](https://learn.chatgpt.com/docs/auth), [usage limits](https://learn.chatgpt.com/docs/pricing).
 
 ## Usage
 

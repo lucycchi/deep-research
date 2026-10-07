@@ -1,5 +1,6 @@
 {
   "name": "open-deep-research",
+  "type": "module",
   "version": "0.0.1",
   "main": "index.ts",
   "scripts": {
@@ -8,7 +9,8 @@
     "start": "tsx --env-file=.env.local src/run.ts",
     "api": "tsx --env-file=.env.local src/api.ts",
     "docker": "tsx src/run.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "tsx --test src/ai/research-model.test.ts",
+    "typecheck": "tsc --noEmit"
   },
   "author": "",
   "license": "ISC",
@@ -28,6 +30,7 @@
     "@ai-sdk/fireworks": "^0.1.14",
     "@ai-sdk/openai": "^1.1.9",
     "@mendable/firecrawl-js": "^1.16.0",
+    "@openai/codex-sdk": "^0.161.0",
     "ai": "^4.1.17",
     "cors": "^2.8.5",
     "express": "^4.18.3",
@@ -35,7 +38,8 @@
     "lodash-es": "^4.17.21",
     "p-limit": "^6.2.0",
     "uuid": "^9.0.1",
-    "zod": "^3.24.1"
+    "zod": "^3.24.1",
+    "zod-to-json-schema": "^3.25.2"
   },
   "engines": {
     "node": "22.x"
