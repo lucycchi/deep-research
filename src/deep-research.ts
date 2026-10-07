@@ -4,7 +4,8 @@ import pLimit from 'p-limit';
 import { z } from 'zod';
 
 import { trimPrompt } from './ai/providers';
-import { generateResearchObject, usesCodex } from './ai/research-model';
+import { generateResearchObject, usesSubscription } from './ai/research-model';
+import { researchWeb, searchProvider } from './ai/web-research';
 import { systemPrompt } from './prompt';
 
 function log(...args: any[]) {
@@ -28,14 +29,18 @@ type ResearchResult = {
 
 // increase this if you have higher API rate limits
 const ConcurrencyLimit =
-  Number(process.env.FIRECRAWL_CONCURRENCY) || (usesCodex() ? 1 : 2);
+  Number(
+    process.env.RESEARCH_CONCURRENCY ?? process.env.FIRECRAWL_CONCURRENCY,
+  ) || (usesSubscription() ? 1 : 2);
 
 // Initialize Firecrawl with optional API key and optional base url
 
-const firecrawl = new FirecrawlApp({
-  apiKey: process.env.FIRECRAWL_KEY ?? '',
-  apiUrl: process.env.FIRECRAWL_BASE_URL,
-});
+function getFirecrawl() {
+  return new FirecrawlApp({
+    apiKey: process.env.FIRECRAWL_KEY ?? '',
+    apiUrl: process.env.FIRECRAWL_BASE_URL,
+  });
+}
 
 // take en user query, return a list of SERP queries
 async function generateSerpQueries({
@@ -95,7 +100,7 @@ async function processSerpResult({
   log(`Ran ${query}, found ${contents.length} contents`);
 
   const res = await generateResearchObject({
-    abortSignal: usesCodex() ? undefined : AbortSignal.timeout(60_000),
+    abortSignal: usesSubscription() ? undefined : AbortSignal.timeout(60_000),
     system: systemPrompt(),
     prompt: trimPrompt(
       `Given the following contents from a SERP search for the query <query>${query}</query>, generate a list of learnings from the contents. Return a maximum of ${numLearnings} learnings, but feel free to return less if the contents are clear. Make sure each learning is unique and not similar to each other. The learnings should be concise and to the point, as detailed and information dense as possible. Make sure to include any entities like people, places, companies, products, things, etc in the learnings, as well as any exact metrics, numbers, or dates. The learnings will be used to research the topic further.\n\n<contents>${contents
@@ -191,6 +196,18 @@ export async function deepResearch({
   visitedUrls?: string[];
   onProgress?: (progress: ResearchProgress) => void;
 }): Promise<ResearchResult> {
+  if (
+    !query.trim() ||
+    !Number.isInteger(breadth) ||
+    breadth < 1 ||
+    !Number.isInteger(depth) ||
+    depth < 1
+  ) {
+    throw new Error(
+      'Research requires a query and positive integer breadth and depth',
+    );
+  }
+  const search = searchProvider();
   const progress: ResearchProgress = {
     currentDepth: depth,
     totalDepth: depth,
@@ -222,22 +239,34 @@ export async function deepResearch({
     serpQueries.map(serpQuery =>
       limit(async () => {
         try {
-          const result = await firecrawl.search(serpQuery.query, {
-            timeout: 15000,
-            limit: 5,
-            scrapeOptions: { formats: ['markdown'] },
-          });
-
-          // Collect URLs from this search
-          const newUrls = compact(result.data.map(item => item.url));
           const newBreadth = Math.ceil(breadth / 2);
           const newDepth = depth - 1;
-
-          const newLearnings = await processSerpResult({
-            query: serpQuery.query,
-            result,
-            numFollowUpQuestions: newBreadth,
-          });
+          let newLearnings: {
+            learnings: string[];
+            followUpQuestions: string[];
+          };
+          let newUrls: string[];
+          if (search === 'agent') {
+            const result = await researchWeb(
+              serpQuery.query,
+              serpQuery.researchGoal,
+              newBreadth,
+            );
+            newLearnings = result;
+            newUrls = result.visitedUrls;
+          } else {
+            const result = await getFirecrawl().search(serpQuery.query, {
+              timeout: 15000,
+              limit: 5,
+              scrapeOptions: { formats: ['markdown'] },
+            });
+            newUrls = compact(result.data.map(item => item.url));
+            newLearnings = await processSerpResult({
+              query: serpQuery.query,
+              result,
+              numFollowUpQuestions: newBreadth,
+            });
+          }
           const allLearnings = [...learnings, ...newLearnings.learnings];
           const allUrls = [...visitedUrls, ...newUrls];
 
@@ -278,7 +307,7 @@ export async function deepResearch({
             };
           }
         } catch (e: any) {
-          if (usesCodex()) throw e;
+          if (usesSubscription()) throw e;
           if (e.message && e.message.includes('Timeout')) {
             log(`Timeout error running query: ${serpQuery.query}: `, e);
           } else {

@@ -77,13 +77,12 @@ flowchart TB
 ## Requirements
 
 - Node.js environment
-- API keys for:
-  - Firecrawl API (for web search and content extraction)
-  - OpenAI API (for o3 mini model)
+- Codex signed in with ChatGPT or Claude Code signed in with an eligible Claude subscription
+- API keys are needed only for the optional Firecrawl/API workflows
 
 ## Setup
 
-### Node.js
+### Node.js (optional API mode)
 
 1. Clone the repository
 2. Install dependencies:
@@ -100,6 +99,7 @@ FIRECRAWL_KEY="your_firecrawl_key"
 # FIRECRAWL_BASE_URL="http://localhost:3002"
 
 RESEARCH_PROVIDER="api"
+SEARCH_PROVIDER="firecrawl"
 OPENAI_KEY="your_openai_key"
 ```
 
@@ -111,7 +111,7 @@ To use local LLM, comment out `OPENAI_KEY` and instead uncomment `OPENAI_ENDPOIN
 ### Docker
 
 1. Clone the repository
-2. Rename `.env.example` to `.env.local` and set your API keys
+2. Copy `.env.example` to `.env.local`, set `RESEARCH_PROVIDER="api"` and `SEARCH_PROVIDER="firecrawl"`, and set your API keys
 
 3. Run `docker build -f Dockerfile`
 
@@ -127,24 +127,53 @@ docker compose up -d
 docker exec -it deep-research npm run docker
 ```
 
-## Use your ChatGPT subscription (default)
+## Research with a subscription (no API keys)
 
-Model reasoning now uses the official Codex TypeScript SDK with ChatGPT login by default. Each research step starts a separate local Codex thread and returns schema-validated JSON. It does not call an existing chat conversation.
+The default workflow uses Codex for live web search, source analysis, follow-up research, and report writing. Firecrawl is optional. Each step starts a separate session and returns validated JSON; this does not call an existing chat conversation.
 
-1. Install dependencies with `npm install`.
-2. Install the current Codex CLI with `npm install -g @openai/codex` and run `codex login`, choosing **Sign in with ChatGPT**. The SDK includes its own CLI runtime and reuses your saved login. Use `CODEX_PATH` only if you want a different Codex executable.
-3. Copy `.env.example` to `.env.local`, set `FIRECRAWL_KEY`, and keep `RESEARCH_PROVIDER="codex"`.
-4. Run `npm start` (interactive) or `npm run api` (local HTTP service).
+1. Run `npm install`.
+2. Install the current Codex CLI with `npm install -g @openai/codex`. Run `codex login` and choose **Sign in with ChatGPT**. The SDK includes its own CLI runtime and reuses the saved login.
+3. Copy `.env.example` to `.env.local`. Keep `RESEARCH_PROVIDER="codex"` and `SEARCH_PROVIDER="agent"`. No API keys are needed.
+4. Run `npm start` for interactive research or `npm run api` for the local HTTP service.
 
-Codex calls are serialized, with a 10-minute timeout per turn. Set `CODEX_TIMEOUT_MS` to change that timeout or `CODEX_MODEL` to choose a model available to your plan. Firecrawl concurrency defaults to 1 in Codex mode; `FIRECRAWL_CONCURRENCY` overrides it.
+### Claude Code subscription
 
-Subscription mode forces ChatGPT authentication and the built-in OpenAI provider, removes API-key environment variables from child processes, and never falls back to API billing. Authentication, quota, timeout, and malformed-response errors stop research rather than silently producing an incomplete report. Codex runs with a read-only sandbox, no approval requests, shell tools disabled, and web search disabled; Firecrawl supplies the source material.
+Install the current native Claude Code CLI using [Anthropic's installation instructions](https://code.claude.com/docs/en/setup), then run `claude auth login` with your Claude subscription account. Claude Code v2.1.248 or later is required for restricted mode; use the latest release for compatibility.
 
-This uses your included Codex allowance, not an unlimited monthly API token balance. Purchased credits or workspace billing settings may still apply to your account; this application does not change those settings. Firecrawl has separate usage limits and costs. Check your plan's usage dashboard before large runs.
+Set these values in `.env.local`:
 
-For the original API providers, explicitly set `RESEARCH_PROVIDER="api"` and configure `OPENAI_KEY` or `FIREWORKS_KEY` as described below. Those calls are billed separately. The original Docker image is an API-mode workflow; subscription mode is intended for a local machine where you can sign in. Never commit or publish Codex credentials, and do not put subscription credentials into public CI.
+```bash
+RESEARCH_PROVIDER="claude-code"
+SEARCH_PROVIDER="agent"
+# Optional:
+# CLAUDE_MODEL="sonnet"
+# CLAUDE_PATH="absolute/path/to/claude"
+# CLAUDE_TIMEOUT_MS="600000"
+```
 
-Official documentation: [Codex SDK](https://learn.chatgpt.com/docs/codex-sdk), [authentication](https://learn.chatgpt.com/docs/auth), [usage limits](https://learn.chatgpt.com/docs/pricing).
+The application invokes the official `claude -p` CLI with structured output, using saved subscription login. It does not use the Anthropic API SDK, extract OAuth tokens, or forward credentials to another service. Before each request, it verifies first-party OAuth subscription authentication and refuses API or cloud-provider authentication. Claude Code's safe and restricted modes disable personal/project customizations; research sessions expose only WebSearch and WebFetch. Analysis and writing sessions expose no built-in tools. Bare mode is deliberately omitted because it requires API authentication.
+
+Claude needs its own eligible subscription; your ChatGPT subscription does not cover Claude Code. Web-tool availability depends on your Claude account, region, and workspace policy. Sign-in, quota, permission, and malformed-response failures stop the run with no API fallback. Account-level extra usage or purchased credits can still apply in either product; this application does not change those billing settings.
+
+### Research and source handling
+
+Subscription calls are serialized, with a 10-minute timeout per call. `CODEX_TIMEOUT_MS` and `CLAUDE_TIMEOUT_MS` adjust the timeouts. `CODEX_MODEL` and `CLAUDE_MODEL` select models available to the corresponding account; `CODEX_PATH` and `CLAUDE_PATH` optionally select a native CLI executable. `RESEARCH_CONCURRENCY` controls research branch concurrency (default 1 for subscriptions); the older `FIRECRAWL_CONCURRENCY` variable remains supported.
+
+In agent search mode, each branch performs live searches and returns findings with supporting HTTP(S) source URLs and follow-up questions. Source links remain attached to findings through recursive research and report generation. Codex sessions must emit a web-search event; unsupported or disabled search fails instead of producing a memory-only report. Codex uses a read-only sandbox with shell tools disabled and command networking disabled; its hosted web search is separate from command networking. Source URLs are model-returned citations, not an independent guarantee that every claim is correct; review sources for important decisions.
+
+This is topic research, not a replacement for all of Firecrawl's capabilities. It does not promise full-page Markdown extraction or bulk website crawling.
+
+### Optional Firecrawl and API modes
+
+To retain Firecrawl for search and scraping while using either subscription backend for reasoning, set `SEARCH_PROVIDER="firecrawl"` and provide `FIRECRAWL_KEY` (or your self-hosted configuration). Firecrawl has separate limits and costs.
+
+To use the original API model providers, explicitly set `RESEARCH_PROVIDER="api"`, `SEARCH_PROVIDER="firecrawl"`, and configure `OPENAI_KEY` or `FIREWORKS_KEY`. API mode also defaults to Firecrawl when `SEARCH_PROVIDER` is omitted. `SEARCH_PROVIDER="agent"` is unavailable in API mode. API calls are billed separately.
+
+The original Docker image is intended for API mode: set both provider variables accordingly. Subscription mode is intended for a local machine where you can sign in. Never publish login credentials or place subscription credentials in public CI.
+
+Validation: `npm run typecheck` and `npm test`. Tests mock CLI/model responses and consume no subscription usage.
+
+Official documentation: [Codex web search](https://learn.chatgpt.com/docs/web-search), [Codex authentication](https://learn.chatgpt.com/docs/auth), [Claude Code CLI automation](https://code.claude.com/docs/en/headless), [Claude subscription access](https://support.claude.com/en/articles/11145838-use-claude-code-with-your-pro-or-max-plan).
 
 ## Usage
 

@@ -28,9 +28,12 @@ test('subscription adapter enforces auth, validates output, serializes calls and
     let active = 0;
     let maximum = 0;
     let response = '{"questions":["Why?"]}';
+    let searched = false;
+    let webMode = 'disabled';
     mock.method(Codex.prototype, 'startThread', (threadOptions: any) => {
       assert.equal(threadOptions.sandboxMode, 'read-only');
       assert.equal(threadOptions.approvalPolicy, 'never');
+      assert.equal(threadOptions.webSearchMode, webMode);
       return {
         run: async (_prompt: string, turnOptions: any) => {
           assert.equal(turnOptions.outputSchema.additionalProperties, false);
@@ -39,7 +42,10 @@ test('subscription adapter enforces auth, validates output, serializes calls and
           maximum = Math.max(maximum, active);
           await new Promise(resolve => setTimeout(resolve, 5));
           active--;
-          return { finalResponse: response };
+          return {
+            finalResponse: response,
+            items: searched ? [{ type: 'web_search' }] : [],
+          };
         },
       };
     });
@@ -54,6 +60,17 @@ test('subscription adapter enforces auth, validates output, serializes calls and
     ]);
     assert.equal(maximum, 1);
     assert.deepEqual(results[0]?.object, { questions: ['Why?'] });
+    webMode = 'live';
+    await assert.rejects(
+      generateResearchObject({ ...request, webResearch: true }),
+      /No API fallback/,
+    );
+    searched = true;
+    assert.deepEqual(
+      (await generateResearchObject({ ...request, webResearch: true })).object,
+      { questions: ['Why?'] },
+    );
+    webMode = 'disabled';
     response = '{"questions":42}';
     await assert.rejects(generateResearchObject(request), /No API fallback/);
     response = 'not JSON';

@@ -9,7 +9,7 @@
     "start": "tsx --env-file=.env.local src/run.ts",
     "api": "tsx --env-file=.env.local src/api.ts",
     "docker": "tsx src/run.ts",
-    "test": "tsx --test src/ai/research-model.test.ts",
+    "test": "tsx --test src/ai/research-model.test.ts src/ai/subscription-research.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "author": "",

@@ -2,7 +2,7 @@ import * as fs from 'fs/promises';
 import * as readline from 'readline';
 
 import { getModel } from './ai/providers';
-import { usesCodex } from './ai/research-model';
+import { researchProvider, usesSubscription } from './ai/research-model';
 import {
   deepResearch,
   writeFinalAnswer,
@@ -33,7 +33,9 @@ function askQuestion(query: string): Promise<string> {
 async function run() {
   console.log(
     'Using model: ',
-    usesCodex() ? 'Codex (ChatGPT subscription)' : getModel().modelId,
+    usesSubscription()
+      ? `${researchProvider()} (subscription)`
+      : getModel().modelId,
   );
 
   // Get initial query
