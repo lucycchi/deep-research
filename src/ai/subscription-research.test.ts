@@ -39,7 +39,7 @@ test('Claude CLI uses only subscription auth and the permitted web tools', async
         if (args[0] === 'auth')
           return JSON.stringify({
             loggedIn,
-            authMethod: loggedIn ? 'oauth' : 'none',
+            authMethod: loggedIn ? 'claude.ai' : 'none',
             apiProvider: 'firstParty',
             subscriptionType: 'max',
           });
@@ -47,6 +47,10 @@ test('Claude CLI uses only subscription auth and the permitted web tools', async
         assert.ok(args.includes('--safe-mode'));
         assert.ok(args.includes('--restricted'));
         assert.ok(args.includes('--strict-mcp-config'));
+        assert.equal(
+          JSON.parse(args[args.indexOf('--json-schema') + 1]!).$schema,
+          undefined,
+        );
         assert.ok(!args.includes('--bare'));
         assert.equal(
           args[args.indexOf('--tools') + 1],

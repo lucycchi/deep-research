@@ -87,7 +87,7 @@ export async function runClaudeCode(
     );
     if (
       !auth.loggedIn ||
-      auth.authMethod !== 'oauth' ||
+      !['claude.ai', 'oauth'].includes(auth.authMethod) ||
       auth.apiProvider !== 'firstParty' ||
       !auth.subscriptionType
     ) {
@@ -123,6 +123,19 @@ export async function runClaudeCode(
       await claudeCli.run(args, prompt, env, cwd, signal),
     );
   } finally {
-    await rm(cwd, { recursive: true, force: true });
+    try {
+      await rm(cwd, {
+        recursive: true,
+        force: true,
+        maxRetries: 10,
+        retryDelay: 100,
+      });
+    } catch {
+      // Windows can briefly retain a handle after the CLI exits. Cleanup must
+      // not discard a successful response or mask the original request error.
+      process.emitWarning(
+        `Could not clean up the temporary Claude directory: ${cwd}`,
+      );
+    }
   }
 }
