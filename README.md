@@ -1,257 +1,257 @@
 # Open Deep Research
 
-An AI-powered research assistant that performs iterative, deep research on any topic by combining search engines, web scraping, and large language models.
+Research a topic through repeated web searches, follow-up questions, and a final Markdown report. Run it locally with **Codex and your ChatGPT subscription** or **Claude Code and your Claude subscription**.
 
-The goal of this repo is to provide the simplest implementation of a deep research agent - e.g. an agent that can refine its research direction over time and deep dive into a topic. Goal is to keep the repo size at <500 LoC so it is easy to understand and build on top of.
+Both subscription modes use built-in web tools. **No OpenAI API key, Anthropic API key, or Firecrawl key is needed.** Codex is the default.
 
-If you like this project, please consider starring it and giving me a follow on [X/Twitter](https://x.com/dzhng). This project is created by [Duet](https://duet.so).
-
-## How It Works
-
-```mermaid
-flowchart TB
-    subgraph Input
-        Q[User Query]
-        B[Breadth Parameter]
-        D[Depth Parameter]
-    end
-
-    DR[Deep Research] -->
-    SQ[SERP Queries] -->
-    PR[Process Results]
-
-    subgraph Results[Results]
-        direction TB
-        NL((Learnings))
-        ND((Directions))
-    end
-
-    PR --> NL
-    PR --> ND
-
-    DP{depth > 0?}
-
-    RD["Next Direction:
-    - Prior Goals
-    - New Questions
-    - Learnings"]
-
-    MR[Markdown Report]
-
-    %% Main Flow
-    Q & B & D --> DR
-
-    %% Results to Decision
-    NL & ND --> DP
-
-    %% Circular Flow
-    DP -->|Yes| RD
-    RD -->|New Context| DR
-
-    %% Final Output
-    DP -->|No| MR
-
-    %% Styling
-    classDef input fill:#7bed9f,stroke:#2ed573,color:black
-    classDef process fill:#70a1ff,stroke:#1e90ff,color:black
-    classDef recursive fill:#ffa502,stroke:#ff7f50,color:black
-    classDef output fill:#ff4757,stroke:#ff6b81,color:black
-    classDef results fill:#a8e6cf,stroke:#3b7a57,color:black
-
-    class Q,B,D input
-    class DR,SQ,PR process
-    class DP,RD recursive
-    class MR output
-    class NL,ND results
-```
-
-## Features
-
-- **Iterative Research**: Performs deep research by iteratively generating search queries, processing results, and diving deeper based on findings
-- **Intelligent Query Generation**: Uses LLMs to generate targeted search queries based on research goals and previous findings
-- **Depth & Breadth Control**: Configurable parameters to control how wide (breadth) and deep (depth) the research goes
-- **Smart Follow-up**: Generates follow-up questions to better understand research needs
-- **Comprehensive Reports**: Produces detailed markdown reports with findings and sources
-- **Concurrent Processing**: Handles multiple searches and result processing in parallel for efficiency
+This fork builds on [dzhng/deep-research](https://github.com/dzhng/deep-research), originally created by [Duet](https://duet.so).
 
 ## Requirements
 
-- Node.js environment
-- Codex signed in with ChatGPT or Claude Code signed in with an eligible Claude subscription
-- API keys are needed only for the optional Firecrawl/API workflows
+- Node.js 22.x and npm, as specified in `package.json`.
+- Internet access for the selected agent's web tools.
+- Codex signed in with a ChatGPT account that has Codex access, or the native Claude Code CLI signed in with an eligible Claude subscription.
 
-## Setup
+Claude Code must support `--safe-mode` and `--restricted` (v2.1.248 or later). Use a current CLI release for either provider.
 
-### Node.js (optional API mode)
+## Install the repository
 
-1. Clone the repository
-2. Install dependencies:
-
-```bash
+```powershell
+git clone https://github.com/lucycchi/deep-research.git
+cd deep-research
 npm install
 ```
 
-3. Set up environment variables in a `.env.local` file:
+If you already have the repository, run `npm install` from its directory.
 
-```bash
-FIRECRAWL_KEY="your_firecrawl_key"
-# If you want to use your self-hosted Firecrawl, add the following below:
-# FIRECRAWL_BASE_URL="http://localhost:3002"
+Create your configuration file:
 
-RESEARCH_PROVIDER="api"
-SEARCH_PROVIDER="firecrawl"
-OPENAI_KEY="your_openai_key"
+```powershell
+Copy-Item .env.example .env.local
 ```
 
-To use local LLM, comment out `OPENAI_KEY` and instead uncomment `OPENAI_ENDPOINT` and `OPENAI_MODEL`:
+On macOS or Linux, use `cp .env.example .env.local`. If `.env.local` already exists, edit it rather than copying over it.
 
-- Set `OPENAI_ENDPOINT` to the address of your local server (eg."http://localhost:1234/v1")
-- Set `OPENAI_MODEL` to the name of the model loaded in your local server.
+**The application loads `.env.local`, not `.env`.** Keep provider settings in `.env.local`. No credentials need to be added to it for subscription mode.
 
-### Docker
+## Option 1: Codex with your ChatGPT subscription
 
-1. Clone the repository
-2. Copy `.env.example` to `.env.local`, set `RESEARCH_PROVIDER="api"` and `SEARCH_PROVIDER="firecrawl"`, and set your API keys
+### Sign in
 
-3. Run `docker build -f Dockerfile`
+Install the Codex CLI and sign in:
 
-4. Run the Docker image:
-
-```bash
-docker compose up -d
+```powershell
+npm install -g @openai/codex
+codex login
 ```
 
-5. Execute `npm run docker` in the docker service:
+Choose **Sign in with ChatGPT** and complete the browser login using your ChatGPT account. Confirm your login:
 
-```bash
-docker exec -it deep-research npm run docker
+```powershell
+codex login status
 ```
 
-## Research with a subscription (no API keys)
+It should report that you are logged in using ChatGPT. The application's Codex SDK includes its own CLI runtime and reuses your saved login.
 
-The default workflow uses Codex for live web search, source analysis, follow-up research, and report writing. Firecrawl is optional. Each step starts a separate session and returns validated JSON; this does not call an existing chat conversation.
-
-1. Run `npm install`.
-2. Install the current Codex CLI with `npm install -g @openai/codex`. Run `codex login` and choose **Sign in with ChatGPT**. The SDK includes its own CLI runtime and reuses the saved login.
-3. Copy `.env.example` to `.env.local`. Keep `RESEARCH_PROVIDER="codex"` and `SEARCH_PROVIDER="agent"`. No API keys are needed.
-4. Run `npm start` for interactive research or `npm run api` for the local HTTP service.
-
-### Claude Code subscription
-
-Install the current native Claude Code CLI using [Anthropic's installation instructions](https://code.claude.com/docs/en/setup), then run `claude auth login` with your Claude subscription account. Claude Code v2.1.248 or later is required for restricted mode; use the latest release for compatibility.
+### Configure and run
 
 Set these values in `.env.local`:
 
-```bash
-RESEARCH_PROVIDER="claude-code"
+```env
+RESEARCH_PROVIDER="codex"
 SEARCH_PROVIDER="agent"
-# Optional:
-# CLAUDE_MODEL="sonnet"
-# CLAUDE_PATH="absolute/path/to/claude"
-# CLAUDE_TIMEOUT_MS="600000"
 ```
 
-The application invokes the official `claude -p` CLI with structured output, using saved subscription login. It does not use the Anthropic API SDK, extract OAuth tokens, or forward credentials to another service. Before each request, it verifies first-party OAuth subscription authentication and refuses API or cloud-provider authentication. Claude Code's safe and restricted modes disable personal/project customizations; research sessions expose only WebSearch and WebFetch. Analysis and writing sessions expose no built-in tools. Bare mode is deliberately omitted because it requires API authentication.
+Then run:
 
-Claude needs its own eligible subscription; your ChatGPT subscription does not cover Claude Code. Web-tool availability depends on your Claude account, region, and workspace policy. Sign-in, quota, permission, and malformed-response failures stop the run with no API fallback. Account-level extra usage or purchased credits can still apply in either product; this application does not change those billing settings.
-
-### Research and source handling
-
-Subscription calls are serialized, with a 10-minute timeout per call. `CODEX_TIMEOUT_MS` and `CLAUDE_TIMEOUT_MS` adjust the timeouts. `CODEX_MODEL` and `CLAUDE_MODEL` select models available to the corresponding account; `CODEX_PATH` and `CLAUDE_PATH` optionally select a native CLI executable. `RESEARCH_CONCURRENCY` controls research branch concurrency (default 1 for subscriptions); the older `FIRECRAWL_CONCURRENCY` variable remains supported.
-
-In agent search mode, each branch performs live searches and returns findings with supporting HTTP(S) source URLs and follow-up questions. Source links remain attached to findings through recursive research and report generation. Codex sessions must emit a web-search event; unsupported or disabled search fails instead of producing a memory-only report. Codex uses a read-only sandbox with shell tools disabled and command networking disabled; its hosted web search is separate from command networking. Source URLs are model-returned citations, not an independent guarantee that every claim is correct; review sources for important decisions.
-
-This is topic research, not a replacement for all of Firecrawl's capabilities. It does not promise full-page Markdown extraction or bulk website crawling.
-
-### Optional Firecrawl and API modes
-
-To retain Firecrawl for search and scraping while using either subscription backend for reasoning, set `SEARCH_PROVIDER="firecrawl"` and provide `FIRECRAWL_KEY` (or your self-hosted configuration). Firecrawl has separate limits and costs.
-
-To use the original API model providers, explicitly set `RESEARCH_PROVIDER="api"`, `SEARCH_PROVIDER="firecrawl"`, and configure `OPENAI_KEY` or `FIREWORKS_KEY`. API mode also defaults to Firecrawl when `SEARCH_PROVIDER` is omitted. `SEARCH_PROVIDER="agent"` is unavailable in API mode. API calls are billed separately.
-
-The original Docker image is intended for API mode: set both provider variables accordingly. Subscription mode is intended for a local machine where you can sign in. Never publish login credentials or place subscription credentials in public CI.
-
-Validation: `npm run typecheck` and `npm test`. Tests mock CLI/model responses and consume no subscription usage.
-
-Official documentation: [Codex web search](https://learn.chatgpt.com/docs/web-search), [Codex authentication](https://learn.chatgpt.com/docs/auth), [Claude Code CLI automation](https://code.claude.com/docs/en/headless), [Claude subscription access](https://support.claude.com/en/articles/11145838-use-claude-code-with-your-pro-or-max-plan).
-
-## Usage
-
-Run the research assistant:
-
-```bash
+```powershell
 npm start
 ```
 
-You'll be prompted to:
+Codex generates queries, searches the web, analyzes findings, and writes the report using your ChatGPT account's Codex access.
 
-1. Enter your research query
-2. Specify research breadth (recommended: 3-10, default: 4)
-3. Specify research depth (recommended: 1-5, default: 2)
-4. Answer follow-up questions to refine the research direction
+## Option 2: Claude Code with your Claude subscription
 
-The system will then:
+### Sign in
 
-1. Generate and execute search queries
-2. Process and analyze search results
-3. Recursively explore deeper based on findings
-4. Generate a comprehensive markdown report
+Install the **native Claude Code CLI** using [Anthropic's installation instructions](https://code.claude.com/docs/en/setup), then sign in:
 
-The final report will be saved as `report.md` or `answer.md` in your working directory, depending on which modes you selected.
-
-### Concurrency
-
-If you have a paid version of Firecrawl or a local version, feel free to increase the `ConcurrencyLimit` by setting the `CONCURRENCY_LIMIT` environment variable so it runs faster.
-
-If you have a free version, you may sometimes run into rate limit errors, you can reduce the limit to 1 (but it will run a lot slower).
-
-### DeepSeek R1
-
-Deep research performs great on R1! We use [Fireworks](http://fireworks.ai) as the main provider for the R1 model. To use R1, simply set a Fireworks API key:
-
-```bash
-FIREWORKS_KEY="api_key"
+```powershell
+claude auth login
 ```
 
-The system will automatically switch over to use R1 instead of `o3-mini` when the key is detected.
+Complete the browser login using your Claude subscription account. Confirm your login:
 
-### Custom endpoints and models
-
-There are 2 other optional env vars that lets you tweak the endpoint (for other OpenAI compatible APIs like OpenRouter or Gemini) as well as the model string.
-
-```bash
-OPENAI_ENDPOINT="custom_endpoint"
-CUSTOM_MODEL="custom_model"
+```powershell
+claude auth status
 ```
 
-## How It Works
+The account must have a Claude subscription accepted by the CLI. A ChatGPT subscription does not provide Claude access.
 
-1. **Initial Setup**
+### Configure and run
 
-   - Takes user query and research parameters (breadth & depth)
-   - Generates follow-up questions to understand research needs better
+Set these values in `.env.local`:
 
-2. **Deep Research Process**
+```env
+RESEARCH_PROVIDER="claude-code"
+SEARCH_PROVIDER="agent"
+```
 
-   - Generates multiple SERP queries based on research goals
-   - Processes search results to extract key learnings
-   - Generates follow-up research directions
+Then run:
 
-3. **Recursive Exploration**
+```powershell
+npm start
+```
 
-   - If depth > 0, takes new research directions and continues exploration
-   - Each iteration builds on previous learnings
-   - Maintains context of research goals and findings
+The application invokes the official `claude -p` CLI with saved subscription login and verifies first-party subscription authentication before each request. Research sessions expose WebSearch and WebFetch; planning and writing expose no built-in tools.
 
-4. **Report Generation**
-   - Compiles all findings into a comprehensive markdown report
-   - Includes all sources and references
-   - Organizes information in a clear, readable format
-  
-## Community implementations
+## Run a research session
 
-**Python**: https://github.com/Finance-LLMs/deep-research-python
+After `npm start`, answer the prompts for:
 
-## License
+1. **Topic:** describe the question, scope, and output you want.
+2. **Breadth:** how many research directions to explore initially. The default is 4.
+3. **Depth:** how many rounds of follow-up research to perform. The default is 2.
+4. **Output:** choose `report` for a detailed report or `answer` for a short answer. The default is `report`.
+5. **Clarification:** in report mode, answer the generated follow-up questions.
 
-MIT License - feel free to use and modify as needed.
+For a first run, try breadth **1** and depth **1** to check your setup with a small investigation. Larger values consume more subscription usage and take longer.
+
+Example topic:
+
+> Compare three approaches to reducing food waste in university dining halls. Prioritize recent primary sources, report measured outcomes, and explain where the evidence is uncertain.
+
+The application collects findings with supporting source URLs and follows new research questions. The final output is saved in the repository directory:
+
+| Output choice | File |
+| --- | --- |
+| `report` | `report.md` |
+| `answer` | `answer.md` |
+
+Each run overwrites the corresponding output file, so rename or copy a report you want to keep. Review the cited sources when accuracy matters.
+
+## Switch providers
+
+Change `RESEARCH_PROVIDER` in `.env.local`, keep `SEARCH_PROVIDER="agent"`, and restart:
+
+| Provider | Setting | Login command |
+| --- | --- | --- |
+| Codex | `RESEARCH_PROVIDER="codex"` | `codex login` |
+| Claude Code | `RESEARCH_PROVIDER="claude-code"` | `claude auth login` |
+
+Each provider uses its own account's allowance. Sessions run separately from your existing chat conversations.
+
+## Usage limits and billing
+
+Subscription mode uses your included agent allowance and **never falls back to API billing**. Child processes exclude model API credentials; Codex enforces ChatGPT sign-in, and Claude Code rejects API and cloud-provider authentication.
+
+Subscription access is not unlimited. Authentication, quota, timeout, web-tool permission, and invalid-response errors stop the run. Purchased credits, workspace billing, or account-level extra usage settings can still apply; this application does not change those settings.
+
+Keep login credentials private. Do not paste tokens into `.env.local`, commit authentication files, or place subscription credentials in public CI.
+
+## Optional settings
+
+Add these to `.env.local` only when needed:
+
+| Variable | Purpose | Default |
+| --- | --- | --- |
+| `CODEX_MODEL` | Select a model available to your Codex account | CLI/account configuration |
+| `CLAUDE_MODEL` | Select a model available to your Claude account | CLI/account configuration |
+| `CODEX_PATH` | Path to a different native Codex executable | SDK-bundled runtime |
+| `CLAUDE_PATH` | Path to the native Claude executable | `claude` on PATH |
+| `CODEX_TIMEOUT_MS` | Timeout per Codex request, in milliseconds | `600000` (10 minutes) |
+| `CLAUDE_TIMEOUT_MS` | Timeout per Claude request, in milliseconds | `600000` (10 minutes) |
+| `RESEARCH_CONCURRENCY` | Number of research branches processed concurrently | `1` in subscription mode |
+| `CONTEXT_SIZE` | Token budget used when trimming prompts | `128000` |
+
+Subscription model calls remain serialized even when branch concurrency increases. The older `FIRECRAWL_CONCURRENCY` setting is also supported when `RESEARCH_CONCURRENCY` is omitted.
+
+## Troubleshooting
+
+| Problem | What to check |
+| --- | --- |
+| `.env.local` is missing | Copy `.env.example` to `.env.local`. A file named `.env` is not loaded by `npm start`. |
+| The wrong provider runs | Check `.env.local` and any overriding environment variables in your terminal, then restart. |
+| Codex login fails | Run `codex login status`, then `codex login` and choose ChatGPT sign-in. |
+| Claude subscription login is rejected | Run `claude auth status`, then `claude auth login` with your subscription account. |
+| `claude` is not found | Install the native CLI, reopen your terminal, or set `CLAUDE_PATH`. |
+| Claude reports an unknown option | Update Claude Code to a current release. |
+| A request times out | Narrow the topic, lower breadth/depth, or increase the provider's timeout. |
+| Web tools are unavailable | Check account, region, and workspace restrictions. Agent research requires web-tool access. |
+| You reach a usage limit | Check the provider's usage dashboard and wait for a reset, or switch to the other signed-in provider. |
+
+## Local HTTP service
+
+To run the service instead of the interactive CLI:
+
+```powershell
+npm run api
+```
+
+It loads the same `.env.local` settings. The default port is `3051`; set `PORT` to change it.
+
+Send a JSON POST request to `/api/research` for a short answer or `/api/generate-report` for a report:
+
+```json
+{
+  "query": "Your research question",
+  "breadth": 1,
+  "depth": 1
+}
+```
+
+The service has no authentication layer. Use it on a trusted local network; requests consume the signed-in account's allowance.
+
+## Optional Firecrawl and API workflows
+
+These alternatives require separate service credentials and may have separate charges. They are not needed for the subscription instructions above.
+
+### Firecrawl search with subscription reasoning
+
+Keep `RESEARCH_PROVIDER="codex"` or `RESEARCH_PROVIDER="claude-code"`, and set:
+
+```env
+SEARCH_PROVIDER="firecrawl"
+FIRECRAWL_KEY="your_firecrawl_key"
+# Optional self-hosted endpoint:
+# FIRECRAWL_BASE_URL="http://localhost:3002"
+```
+
+Firecrawl handles search and Markdown extraction; the selected agent handles reasoning. Agent search is intended for topic research and does not reproduce all of Firecrawl's bulk crawling capabilities.
+
+### API model providers
+
+To explicitly enable the original API workflow:
+
+```env
+RESEARCH_PROVIDER="api"
+SEARCH_PROVIDER="firecrawl"
+FIRECRAWL_KEY="your_firecrawl_key"
+OPENAI_KEY="your_openai_key"
+```
+
+For Fireworks, configure `FIREWORKS_KEY` instead of `OPENAI_KEY`. For an OpenAI-compatible endpoint, configure `OPENAI_ENDPOINT` and `CUSTOM_MODEL` alongside `OPENAI_KEY` (use the endpoint's required key or placeholder). These settings are used only in API mode. `SEARCH_PROVIDER="agent"` is unavailable in API mode.
+
+The existing Docker workflow requires explicit API/Firecrawl configuration. The subscription instructions above are for local execution with saved CLI login.
+
+## Development
+
+```powershell
+npm run typecheck
+npm test
+```
+
+Tests use mocked model/CLI responses and do not consume subscription usage. Live Codex and Claude subscription web research and report generation have also been verified during development.
+
+## Official documentation
+
+- [Codex authentication](https://learn.chatgpt.com/docs/auth)
+- [Codex web search](https://learn.chatgpt.com/docs/web-search)
+- [Codex usage limits](https://learn.chatgpt.com/docs/pricing)
+- [Claude Code installation](https://code.claude.com/docs/en/setup)
+- [Claude Code programmatic usage](https://code.claude.com/docs/en/headless)
+- [Claude Code with a Claude subscription](https://support.claude.com/en/articles/11145838-use-claude-code-with-your-pro-or-max-plan)
+
+## License and community
+
+MIT License. The original project's community implementations include [Deep Research Python](https://github.com/Finance-LLMs/deep-research-python).
